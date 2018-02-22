@@ -1,0 +1,23 @@
+{
+  "name": "rereact-nano",
+  "version": "0.1.0",
+  "scripts": {
+    "build": "bsb -make-world",
+    "start": "bsb -make-world -w",
+    "clean": "bsb -clean-world",
+    "bundle": "parcel -o src/index.html"
+  },
+  "keywords": [
+    "BuckleScript"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "bs-platform": "^2.1.0"
+  },
+  "dependencies": {
+    "bs-jest": "^0.3.2",
+    "bs-nice": "^0.1.6",
+    "bs-webapi": "^0.7.0"
+  }
+}
