@@ -4,6 +4,7 @@ let createDomElement =
     (
       name,
       ~id: option(string)=?,
+      ~href: option(string)=?,
       ~value: option(string)=?,
       ~disabled: option(bool)=?,
       ~onClick: option(Dom.event => unit)=?,
@@ -14,7 +15,11 @@ let createDomElement =
       ~children: list(reactElement),
       _: unit
     ) =>
-  Nested(name, {id, value, disabled, onClick, src, className, onChange, placeholder}, children);
+  Nested(
+    name,
+    {id, href, value, disabled, onClick, src, className, onChange, placeholder},
+    children
+  );
 
 let div = createDomElement("div");
 
@@ -43,3 +48,5 @@ let button = createDomElement("button");
 let input = createDomElement("input");
 
 let p = createDomElement("p");
+
+let a = createDomElement("a");

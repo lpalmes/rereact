@@ -7,6 +7,7 @@ module Box = {
       (
         ~element="div",
         ~id: option(string)=?,
+        ~href: option(string)=?,
         ~value: option(string)=?,
         ~disabled: option(bool)=?,
         ~onClick: option(Dom.event => unit)=?,
@@ -105,7 +106,7 @@ module Box = {
         _make: unit
       ) =>
     Rereact.element({
-      debugName: "MiniTest",
+      debugName: "JsxNice(" ++ element ++ ")",
       initialState: () => (),
       didMount: _self => (),
       reducer: (_, _) => Rereact.NoUpdate,
@@ -483,7 +484,17 @@ module Box = {
           );
         Rereact.Nested(
           element,
-          {id, value, disabled, onClick, src, className: Some(styles), onChange, placeholder},
+          {
+            id,
+            href,
+            value,
+            disabled,
+            onClick,
+            src,
+            className: Some(styles),
+            onChange,
+            placeholder
+          },
           children
         );
       }

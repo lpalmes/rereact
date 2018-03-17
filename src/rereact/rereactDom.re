@@ -1,272 +1,287 @@
 open Rereact;
 
-type renderedElement =
-  | IFlat(list(opaqueInstance))
-  | INested(string, list(renderedElement), RereactProps.props, Dom.element)
-and instance('state, 'action) = {
-  mutable component: component('state, 'action),
-  element,
-  mutable iState: 'state,
-  mutable instanceSubTree: renderedElement,
-  mutable dom: Dom.element,
-  pendingStateUpdates: ref(list('state => update('state, 'action)))
-}
-and opaqueInstance =
-  | Instance(instance('state, 'action)): opaqueInstance;
+type fiberTag =
+  | Host
+  | Component
+  | HostRoot;
 
-let globalInstance = ref(IFlat([]));
+type effectTag =
+  | Placement
+  | Deletion
+  | Update;
 
-let executePendingStateUpdates = opaqueInstance => {
-  let Instance(instance) = opaqueInstance;
-  let executeUpdate = (~state, stateUpdate) =>
-    switch (stateUpdate(state)) {
-    | NoUpdate => state
-    | Update(newState) => newState
-    };
-  let rec executeUpdates = (~state, stateUpdates) =>
-    switch stateUpdates {
-    | [] => state
-    | [stateUpdate, ...otherStateUpdates] =>
-      let nextState = executeUpdate(~state, stateUpdate);
-      executeUpdates(~state=nextState, otherStateUpdates);
-    };
-  let pendingUpdates = List.rev(instance.pendingStateUpdates^);
-  instance.pendingStateUpdates := [];
-  let nextState = executeUpdates(~state=instance.iState, pendingUpdates);
-  instance.iState = nextState;
+type fiberUpdateHost = {
+  from: fiberTag,
+  dom: Dom.element,
+  children: reactElement
 };
 
-let createInstance = (~component, ~element) => {
-  let iState = component.initialState();
-  {
-    component,
-    element,
-    dom: Webapi.Dom.Document.createElement("span", Webapi.Dom.document),
-    iState,
-    instanceSubTree: IFlat([]),
-    pendingStateUpdates: ref([])
-  };
+type fiber = {
+  tag: fiberTag,
+  fiberType: reactElement,
+  parent: option(fiber),
+  mutable child: option(fiber),
+  mutable sibling: option(fiber),
+  alternate: option(fiber),
+  effectTag: option(effectTag),
+  mutable stateNode: option(Dom.element),
+  mutable effects: list(fiber)
 };
 
-let mapListToOptionals = (b: list('b)) : list(option('b)) => List.map(a => Some(a), b);
+type fiberUpdate =
+  | Host(fiberUpdateHost);
 
-let rec addOptionalElements = howMany =>
-  switch howMany {
-  | 0 => []
-  | n when n > 0 => [None] @ addOptionalElements(howMany - 1)
-  | n when n < 0 => []
-  | _ => []
-  };
+let updateQueue: ref(list(fiberUpdate)) = ref([]);
 
-let equalizeList = (a, b) => {
-  let aLength = List.length(a);
-  let bLength = List.length(b);
-  if (aLength == bLength) {
-    (mapListToOptionals(a), mapListToOptionals(b));
-  } else {
-    let maxLength = max(aLength, bLength);
-    if (aLength == maxLength) {
-      (mapListToOptionals(a), mapListToOptionals(b) @ addOptionalElements(aLength - bLength));
-    } else {
-      (mapListToOptionals(a) @ addOptionalElements(bLength - aLength), mapListToOptionals(b));
+let fiberRoot: ref(option(fiber)) = ref(None);
+
+let nextUnitOfWork: ref(option(fiber)) = ref(None);
+
+let pendingCommit: ref(option(fiber)) = ref(None);
+
+let requestIdleCallback = f =>
+  WindowRe.requestIdleCallback((_) => f(), Webapi.Dom.window) |> ignore;
+
+let reconcileChildrenArray = (wipFiber: fiber, elements: list(reactElement)) => {
+  let index = ref(0);
+  let oldFiber =
+    switch wipFiber.alternate {
+    | Some({child}) => ref(child)
+    | None => ref(None)
     };
-  };
-};
-
-let rec reconcile =
-        (parentDom: Dom.element, instance: option(renderedElement), element: option(reactElement)) =>
-  switch (instance, element) {
-  | (None, Some(Nested(name, props, elements))) =>
-    let node = Webapi.Dom.Document.createElement(name, Webapi.Dom.document);
-    Webapi.Dom.Element.appendChild(node, parentDom);
-    RereactProps.reconcile(node, None, props);
-    let els =
-      List.map(reconcile(node, None), List.map(e => Some(e), elements))
-      |> List.fold_left(
-           (instances, e) =>
-             switch e {
-             | Some(instance) => [instance, ...instances]
-             | None => instances
-             },
-           []
-         )
-      |> List.rev;
-    Some(INested(name, els, props, node));
-  | (Some(INested(_, _, _, dom)), None) =>
-    let _ = Webapi.Dom.Element.removeChild(dom, parentDom);
-    None;
-  | (Some(INested(iName, _, _, dom)), Some(Nested(name, props, elements))) when iName != name =>
-    let _ = Webapi.Dom.Element.removeChild(dom, parentDom);
-    let node = Webapi.Dom.Document.createElement(name, Webapi.Dom.document);
-    Webapi.Dom.Element.appendChild(node, parentDom);
-    RereactProps.reconcile(node, None, props);
-    let els =
-      List.map(reconcile(node, None), List.map(e => Some(e), elements))
-      |> List.fold_left(
-           (instances, e) =>
-             switch e {
-             | Some(instance) => [instance, ...instances]
-             | None => instances
-             },
-           []
-         )
-      |> List.rev;
-    Some(INested(name, els, props, node));
-  | (Some(INested(iName, iElements, prevProps, dom)), Some(Nested(name, props, elements)))
-      when iName == name =>
-    let (a, b) = equalizeList(iElements, elements);
-    /* List.iter(Js.log, iElements);
-       print_newline();
-       List.iter(Js.log, elements); */
-    if (List.length(a) != List.length(b)) {
-      Js.log("Lists are different size");
-      Js.log(List.length(a));
-      Js.log(List.length(b));
-    } else {
-      ();
-    };
-    let els =
-      List.map2(reconcile(dom), a, b)
-      |> List.fold_left(
-           (instances, e) =>
-             switch e {
-             | Some(instance) => [instance, ...instances]
-             | None => instances
-             },
-           []
-         )
-      |> List.rev;
-    RereactProps.reconcile(dom, Some(prevProps), props);
-    Some(INested(name, els, props, dom));
-  | (None, Some(Flat(elements))) =>
-    let els =
-      elements
-      |> List.map(reconcileElement(parentDom, None))
-      |> List.fold_left(
-           (instances, e) =>
-             switch e {
-             | Some(instance) => [instance, ...instances]
-             | None => instances
-             },
-           []
-         );
-    Some(IFlat(els));
-  | (Some(IFlat(instances)), Some(Flat(elements))) =>
-    let els =
-      elements
-      |> List.map2(reconcileElement(parentDom), List.map(i => Some(i), instances))
-      |> List.fold_left(
-           (instances, e) =>
-             switch e {
-             | Some(instance) => [instance, ...instances]
-             | None => instances
-             },
-           []
-         )
-      |> List.rev;
-    Some(IFlat(els));
-  | _ => None
-  }
-and reconcileElement =
-    (parentDom: Dom.element, instance: option(opaqueInstance), element)
-    : option(opaqueInstance) =>
-  switch (instance, element) {
-  | (None, Component(component)) =>
-    let instance = createInstance(~component, ~element);
-    let self = createSelf(Obj.magic(instance));
-    let subElements = component.render(Obj.magic(self));
-    let instanceSubTree = reconcile(parentDom, None, Some(subElements));
-    switch instanceSubTree {
-    | Some(v) =>
-      switch v {
-      | INested(_, _, _, dom) => instance.dom = dom
-      | _ => ()
+  let newFiber: ref(option(fiber)) = ref(None);
+  while (index^ < List.length(elements) || oldFiber^ != None) {
+    let prevFiber = newFiber^;
+    let element = List.nth(elements, index^);
+    switch (oldFiber^, element) {
+    | (None, elm) =>
+      newFiber :=
+        Some({
+          tag:
+            switch element {
+            | Flat(Component(_)) => Component
+            | Flat(String(_)) => Host
+            | Flat(Nil) => Host
+            | Nested(_, _, _) => Host
+            },
+          fiberType: element,
+          parent: Some(wipFiber),
+          child: None,
+          sibling: None,
+          alternate: None,
+          effectTag: Some(Placement),
+          effects: [],
+          stateNode: None
+        });
+      if (index^ == 0) {
+        wipFiber.child = newFiber^;
+      } else {
+        switch prevFiber {
+        | Some(prev) => prev.sibling = newFiber^
+        | None => ()
+        };
       };
-      instance.instanceSubTree = v;
-    | None => ()
+    | _ => ()
     };
-    component.didMount(Obj.magic(self));
-    Some(Instance(instance));
-  | (
-      Some(Instance({element: Component(_), dom, instanceSubTree} as instance)),
-      Component(newComponent)
-    ) =>
-    instance.component = Obj.magic(newComponent);
-    let self = createSelf(Obj.magic(instance));
-    let subElements = newComponent.render(Obj.magic(self));
-    let instanceSubTree = reconcile(dom, Some(instanceSubTree), Some(subElements));
-    switch instanceSubTree {
-    | Some(v) =>
-      switch v {
-      | INested(_, _, _, dom) => instance.dom = dom
-      | _ => ()
-      };
-      instance.instanceSubTree = v;
-    | None => ()
-    };
-    Some(Instance({...instance, element}));
-  | (None, String(value)) =>
-    let node = Webapi.Dom.Document.createElement("span", Webapi.Dom.document);
-    Webapi.Dom.Element.appendChild(node, parentDom);
-    Webapi.Dom.Element.setInnerText(node, value);
-    Some(
-      Instance({
-        component: basicComponent("String"),
-        element,
-        iState: (),
-        instanceSubTree: IFlat([]),
-        dom: node,
-        pendingStateUpdates: ref([])
-      })
-    );
-  | (Some(Instance({element: String(iValue), dom} as instc)), String(value)) =>
-    if (iValue == value) {
-      Some(Instance(instc));
-    } else {
-      Webapi.Dom.Element.setInnerText(dom, value);
-      Some(Instance({...instc, element}));
-    }
-  | _ => None
-  }
-and createSelf = instance : self(_) => {
-  state: instance.iState,
+    index := index^ + 1;
+  };
+};
+
+let createSelf = component : self(_) => {
+  state: component.initialState(),
   reduce: (payloadToAction, payload) => {
     let action = payloadToAction(payload);
-    let stateUpdate = instance.component.reducer(action);
-    instance.pendingStateUpdates := [stateUpdate, ...instance.pendingStateUpdates^];
-    executePendingStateUpdates(Instance(instance));
-    reconcileElement(instance.dom, Some(Instance(instance)), instance.element) |> ignore;
+    let stateUpdate = component.reducer(action);
+    ();
   },
   send: action => {
-    let stateUpdate = instance.component.reducer(action);
-    instance.pendingStateUpdates := [stateUpdate, ...instance.pendingStateUpdates^];
-    executePendingStateUpdates(Instance(instance));
-    reconcileElement(instance.dom, Some(Instance(instance)), instance.element) |> ignore;
+    let newState = component.reducer(action, component.initialState());
+    switch newState {
+    | NoUpdate => component.initialState()
+    | Update(state) => state
+    };
+    Js.log(newState);
   }
+};
+
+let updateComponent = (wipFiber: fiber) =>
+  switch wipFiber.fiberType {
+  | Flat(Component(component)) =>
+    let self = createSelf(component);
+    let element = component.render(self);
+    reconcileChildrenArray(wipFiber, [element]);
+  };
+
+let updateHost = (wipFiber: fiber) =>
+  switch wipFiber.fiberType {
+  | Nested(name, props, elements) =>
+    switch wipFiber.stateNode {
+    | None =>
+      let node = Webapi.Dom.Document.createElement(name, Webapi.Dom.document);
+      RereactProps.reconcile(node, None, props);
+      wipFiber.stateNode = Some(node);
+    | Some(_) => ()
+    };
+    reconcileChildrenArray(wipFiber, elements);
+  | Flat(Component(_)) => updateComponent(wipFiber)
+  | Flat(String(value)) =>
+    switch wipFiber.stateNode {
+    | None =>
+      let node = Webapi.Dom.Document.createTextNode(value, Webapi.Dom.document);
+      Webapi.Dom.Document.setNodeValue(Obj.magic(node), Js.Null.return(value));
+      wipFiber.stateNode = Some(Obj.magic(node));
+    | Some(_) => ()
+    }
+  | Flat(Nil) => ()
+  };
+
+let beginWork = wipFiber =>
+  switch wipFiber.tag {
+  | Host
+  | HostRoot => updateHost(wipFiber)
+  | Component => updateComponent(wipFiber)
+  };
+
+let completeWork = fiber =>
+  switch fiber.parent {
+  | Some(parent) =>
+    let childEffects = fiber.effects;
+    let fiberEffects = fiber.effectTag != None ? [fiber] : [];
+    let parentEffects = parent.effects;
+    parent.effects = parentEffects @ childEffects @ fiberEffects;
+  | None => pendingCommit := Some(fiber)
+  };
+
+let perfomUnitOfWork = (wipFiber: fiber) : option(fiber) => {
+  beginWork(wipFiber);
+  switch wipFiber.child {
+  | Some(_) => wipFiber.child
+  | None =>
+    let unitOfWork = ref(Some(wipFiber));
+    let returnUnitOfWork: ref(option(fiber)) = ref(None);
+    while (unitOfWork^ != None) {
+      let Some(unit) = unitOfWork^;
+      completeWork(unit);
+      switch unit.sibling {
+      | Some(sibiling) =>
+        unitOfWork := None;
+        returnUnitOfWork := Some(sibiling);
+      | None => unitOfWork := unit.parent
+      };
+    };
+    returnUnitOfWork^;
+  };
+};
+
+let resetNextUnitOfWork = () => {
+  let update =
+    switch updateQueue^ {
+    | [Host(update)] =>
+      updateQueue := [];
+      Some(update);
+    | [Host(update), ...data] =>
+      updateQueue := data;
+      Some(update);
+    | [] => None
+    };
+  switch update {
+  | Some(update) =>
+    nextUnitOfWork :=
+      Some({
+        tag: HostRoot,
+        fiberType: update.children,
+        parent: None,
+        child: None,
+        sibling: None,
+        alternate: fiberRoot^,
+        effectTag: None,
+        effects: [],
+        stateNode: Some(update.dom)
+      })
+  | None => ()
+  };
+};
+
+let commitWork = fiber =>
+  switch fiber.tag {
+  | HostRoot => ()
+  | _ =>
+    switch fiber.parent {
+    | None => ()
+    | Some(parent) =>
+      let parentFiber = ref(parent);
+      while (parentFiber.contents.tag == Component) {
+        switch parentFiber.contents.parent {
+        | Some(parent) => parentFiber := parent
+        | None => assert false
+        };
+      };
+      switch parentFiber.contents.stateNode {
+      | None => ()
+      | Some(domParent) =>
+        switch fiber.effectTag {
+        | Some(Placement) =>
+          switch fiber.stateNode {
+          | Some(node) => Webapi.Dom.Element.appendChild(node, domParent)
+          | None => ()
+          }
+        | Some(Update) => Js.log("Update")
+        | Some(Deletion) => Js.log("Deleition")
+        | None => Js.log("No effect")
+        }
+      };
+    }
+  };
+
+let commitAllWork = fiber => {
+  List.iter(commitWork, fiber.effects);
+  nextUnitOfWork := None;
+  pendingCommit := None;
+  fiberRoot := Some(fiber);
+};
+
+let workLoop = () => {
+  switch nextUnitOfWork^ {
+  | None => resetNextUnitOfWork()
+  | _ => ()
+  };
+  while (nextUnitOfWork^ != None) {
+    Js.log("inside workloop");
+    nextUnitOfWork :=
+      (
+        switch nextUnitOfWork^ {
+        | Some(unit) => perfomUnitOfWork(unit)
+        | None => None
+        }
+      );
+  };
+  switch pendingCommit^ {
+  | Some(pendingCommit) => commitAllWork(pendingCommit)
+  | None => ()
+  };
+};
+
+let rec perfomWork = () => {
+  workLoop();
+  let moreWork =
+    switch nextUnitOfWork^ {
+    | Some(_) => true
+    | None => false
+    };
+  ();
+  /* if (moreWork || List.length(updateQueue^) > 0) {
+       requestIdleCallback(perfomWork);
+     }; */
 };
 
 let parentContainer = ref(Webapi.Dom.Document.createElement("span", Webapi.Dom.document));
 
-let rootInstance: ref(option(renderedElement)) = ref(None);
-
-let render = (reactElement, containerName) => {
-  print_endline("render");
+let render = (reactElement: reactElement, containerName) => {
+  Js.log(fiberRoot);
   switch (Webapi.Dom.Document.getElementById(containerName, Webapi.Dom.document)) {
   | Some(dom) =>
-    parentContainer := dom;
-    rootInstance := reconcile(parentContainer^, rootInstance^, Some(reactElement));
-    switch rootInstance^ {
-    | Some(v) => v
-    | None => IFlat([])
-    };
-  | None =>
-    print_endline("No dom element found :(");
-    IFlat([]);
+    updateQueue := updateQueue^ @ [Host({from: HostRoot, dom, children: reactElement})];
+    requestIdleCallback(perfomWork);
+  | None => ()
   };
 };
-
-let hotUpdate = (reactElement, instance) =>
-  switch (reconcile(parentContainer^, Some(instance), Some(reactElement))) {
-  | Some(v) => v
-  | None => IFlat([])
-  };

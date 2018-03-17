@@ -1,5 +1,6 @@
 type props = {
   id: option(string),
+  href: option(string),
   value: option(string),
   className: option(string),
   placeholder: option(string),
@@ -11,6 +12,7 @@ type props = {
 
 let defaultProps = {
   id: None,
+  href: None,
   value: None,
   disabled: None,
   className: None,
@@ -43,6 +45,7 @@ let reconcile = (domElement: Dom.element, prevProps: option(props), props: props
   reconcileStringProp(domElement, prevProps, props.className, "class");
   reconcileStringProp(domElement, prevProps, props.src, "src");
   reconcileStringProp(domElement, prevProps, props.value, "value");
+  reconcileStringProp(domElement, prevProps, props.href, "href");
   reconcileStringProp(domElement, prevProps, props.placeholder, "placeholder");
   switch props.disabled {
   | Some(value) =>

@@ -29,8 +29,9 @@ and self('state, 'action) = {
 type element =
   | String(string)
   | Component(component('state, 'action)): element
+  | Nil
 and reactElement =
-  | Flat(list(element))
+  | Flat(element)
   | Nested(string, props, list(reactElement))
 and componentSpec('state, 'initialState, 'action) = {
   debugName: string,
@@ -55,10 +56,12 @@ let statefulComponent = debugName => basicComponent(debugName);
 
 let reducerComponent = debugName => basicComponent(debugName);
 
-let stringToElement = value => Flat([String(value)]);
+let stringToElement = value => Flat(String(value));
 
 let listToElement = value => Nested("div", defaultProps, value);
 
-let nullElement = Flat([]);
+let nullElement = Flat(Nil);
 
-let element = component => Flat([Component(component)]);
+let nilElement = Flat(Nil);
+
+let element = component => Flat(Component(component));
