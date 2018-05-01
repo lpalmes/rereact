@@ -56,12 +56,14 @@ let statefulComponent = debugName => basicComponent(debugName);
 
 let reducerComponent = debugName => basicComponent(debugName);
 
-let stringToElement = value => Flat(String(value));
+let string = value => Flat(String(value));
 
-let listToElement = value => Nested("div", defaultProps, value);
+let list = value => Nested("div", defaultProps, value);
 
-let nullElement = Flat(Nil);
+let array = value => Nested("div", defaultProps, Array.to_list(value));
 
-let nilElement = Flat(Nil);
+let null = Flat(Nil);
+
+let nil = Flat(Nil);
 
 let element = component => Flat(Component(component));
