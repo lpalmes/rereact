@@ -9,6 +9,7 @@ let createDomElement =
       ~disabled: option(bool)=?,
       ~onClick: option(Dom.event => unit)=?,
       ~onChange: option(Dom.event => unit)=?,
+      ~onChangeText: option(string => unit)=?,
       ~className: option(string)=?,
       ~placeholder: option(string)=?,
       ~src: option(string)=?,
@@ -17,7 +18,7 @@ let createDomElement =
     ) =>
   Nested(
     name,
-    {id, href, value, disabled, onClick, src, className, onChange, placeholder},
+    {id, href, value, disabled, onClick, src, className, onChange, onChangeText, placeholder},
     children
   );
 

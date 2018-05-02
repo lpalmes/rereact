@@ -12,6 +12,7 @@ module Box = {
         ~disabled: option(bool)=?,
         ~onClick: option(Dom.event => unit)=?,
         ~onChange: option(Dom.event => unit)=?,
+        ~onChangeText: option(string => unit)=?,
         ~src: option(string)=?,
         ~className: option(string)=?,
         ~placeholder: option(string)=?,
@@ -493,6 +494,7 @@ module Box = {
             src,
             className: Some(styles),
             onChange,
+            onChangeText,
             placeholder
           },
           children

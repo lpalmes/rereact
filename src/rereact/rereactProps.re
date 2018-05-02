@@ -7,7 +7,8 @@ type props = {
   src: option(string),
   disabled: option(bool),
   onClick: option(Dom.event => unit),
-  onChange: option(Dom.event => unit)
+  onChange: option(Dom.event => unit),
+  onChangeText: option(string => unit)
 };
 
 let defaultProps = {
@@ -19,7 +20,8 @@ let defaultProps = {
   placeholder: None,
   src: None,
   onClick: None,
-  onChange: None
+  onChange: None,
+  onChangeText: None
 };
 
 let reconcileStringProp =
@@ -67,11 +69,37 @@ let reconcile = (domElement: Dom.element, prevProps: option(props), props: props
   };
   switch (prevProps, props.onChange) {
   | (None, Some(func)) => Webapi.Dom.Element.addEventListener("input", func, domElement)
-  | (Some({onClick: Some(prevFunc)}), Some(func)) when prevFunc !== func =>
+  | (Some({onChange: Some(prevFunc)}), Some(func)) when prevFunc !== func =>
     Webapi.Dom.Element.removeEventListener("input", prevFunc, domElement);
     Webapi.Dom.Element.addEventListener("input", func, domElement);
-  | (Some({onClick: Some(prevFunc)}), None) =>
+  | (Some({onChange: Some(prevFunc)}), None) =>
     Webapi.Dom.Element.removeEventListener("input", prevFunc, domElement)
+  | _ => ()
+  };
+  switch (prevProps, props.onChangeText) {
+  | (None, Some(func)) =>
+    Webapi.Dom.Element.addEventListener(
+      "input",
+      e => Obj.magic(e)##target##value |> func,
+      domElement
+    )
+  | (Some({onChangeText: Some(prevFunc)}), Some(func)) when prevFunc !== func =>
+    Webapi.Dom.Element.removeEventListener(
+      "input",
+      e => Obj.magic(e)##target##value |> prevFunc,
+      domElement
+    );
+    Webapi.Dom.Element.addEventListener(
+      "input",
+      e => Obj.magic(e)##target##value |> func,
+      domElement
+    );
+  | (Some({onChangeText: Some(prevFunc)}), None) =>
+    Webapi.Dom.Element.removeEventListener(
+      "input",
+      e => Obj.magic(e)##target##value |> prevFunc,
+      domElement
+    )
   | _ => ()
   };
 };

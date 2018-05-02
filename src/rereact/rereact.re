@@ -22,7 +22,6 @@ type update('state, 'action) =
   | Update('state)
 and self('state, 'action) = {
   state: 'state,
-  reduce: 'payload .reduce('payload, 'action),
   send: 'action => unit
 };
 
