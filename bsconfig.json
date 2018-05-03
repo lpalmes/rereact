@@ -5,13 +5,16 @@
     {
       "dir": "src",
       "subdirs": true
+    },
+    {
+      "dir": "examples",
+      "type": "dev"
     }
   ],
   "package-specs": {
-    "module": "commonjs",
-    "in-source": true
+    "module": "commonjs"
   },
   "suffix": ".bs.js",
-  "bs-dependencies": ["bs-webapi", "bs-jest", "bs-nice"],
+  "bs-dependencies": ["bs-webapi", "bs-nice"],
   "refmt": 3
 }
