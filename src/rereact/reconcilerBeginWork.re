@@ -10,18 +10,9 @@ let reconcileChildrenArray = (Fiber(wipFiber), elements: list(reactElement)) => 
     | None => ref(None)
     };
   let newFiber: ref(option(opaqueFiber)) = ref(None);
-  List.length(elements) |> string_of_int |> print_endline;
-  List.map(RereactDebug.getFiberElement, elements)
-  |> List.fold_left((a, b) => a ++ " " ++ b, "")
-  |> print_endline;
-  while (index^ < List.length(elements) || oldFiber^ != None) {
+  while (index^ < Belt.List.length(elements) || oldFiber^ != None) {
     let prevFiber = newFiber^;
-    let element =
-      if (index^ < List.length(elements)) {
-        Some(List.nth(elements, index^));
-      } else {
-        None;
-      };
+    let element = Belt.List.get(elements, index^);
     switch (oldFiber^, element) {
     | (None, Some(elm)) =>
       newFiber :=
@@ -104,7 +95,7 @@ let reconcileChildrenArray = (Fiber(wipFiber), elements: list(reactElement)) => 
         oldFiber.effectTag = Some(Deletion);
         wipFiber.effects = wipFiber.effects @ [Fiber(oldFiber)];
       };
-    | _ => print_endline("default case")
+    | _ => ()
     };
     switch oldFiber^ {
     | Some(Fiber(old)) => oldFiber := old.sibling

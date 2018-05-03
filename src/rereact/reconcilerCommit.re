@@ -1,20 +1,15 @@
 open RereactTypes;
 
 let commitDeletion = (fiber, domParent) => {
-  print_endline("Commiting deletion");
   let node = ref(Some(fiber));
   let break = ref(false);
   while (break^ == false) {
     switch node^ {
-    | Some(Fiber({tag: Component, child})) =>
-      print_endline("Fiber is component, moving into child");
-      node := child;
+    | Some(Fiber({tag: Component, child})) => node := child
     | Some(Fiber({stateNode: Some(domNode), sibling}) as fiberNode) =>
-      print_endline("Fiber has stateNode, removing it");
       Webapi.Dom.Element.removeChild(domNode, domParent) |> ignore;
       let internalBreak = ref(false);
       while (internalBreak^ == false) {
-        print_endline("In while loop");
         switch node^ {
         | Some(Fiber(internalNode) as n) =>
           if (n !== fiber) {
@@ -28,20 +23,15 @@ let commitDeletion = (fiber, domParent) => {
         };
       };
       if (fiberNode == fiber) {
-        print_endline("Fiber node is the same as passed, breaking loop");
         break := true;
       };
       node := sibling;
-      print_endline("Moving to sibling");
-    | _ =>
-      break := true;
-      print_endline("Default case, just stop it");
+    | _ => break := true
     };
   };
 };
 
 let commitWork = (Fiber(fiber)) =>
-  /* Debug.getFiberElement(fiber) ++ " " ++ Debug.getFiberEffect(fiber) |> print_endline; */
   switch fiber.tag {
   | HostRoot => ()
   | _ =>
@@ -84,8 +74,7 @@ let commitWork = (Fiber(fiber)) =>
   };
 
 let commitAllWork = fiber => {
-  /* print_endline("Committing:"); */
-  List.iter(commitWork, fiber.effects);
+  Belt.List.forEach(fiber.effects, commitWork);
   ReconcilerGlobals.nextUnitOfWork := None;
   ReconcilerGlobals.pendingCommit := None;
   ReconcilerGlobals.fiberRoot := Some(Fiber(fiber));

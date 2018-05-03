@@ -59,7 +59,7 @@ let string = value => Flat(String(value));
 
 let list = value => Nested("div", defaultProps, value);
 
-let array = value => Nested("div", defaultProps, Array.to_list(value));
+let array = value => Nested("div", defaultProps, Belt.List.fromArray(value));
 
 let null = Flat(Nil);
 

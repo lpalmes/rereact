@@ -10,8 +10,6 @@ let getRoot = fiber => {
     | _ => ()
     };
   };
-  RereactDebug.getFiberElement(node.contents.fiberType) |> print_endline;
-  RereactDebug.getFiberTag(node^) |> print_endline;
   node^;
 };
 
@@ -65,7 +63,6 @@ let resetNextUnitOfWork = () => {
 };
 
 let workLoop = () => {
-  /* print_endline("Work Loop: "); */
   switch ReconcilerGlobals.nextUnitOfWork^ {
   | None => resetNextUnitOfWork()
   | _ => ()
@@ -74,21 +71,13 @@ let workLoop = () => {
     ReconcilerGlobals.nextUnitOfWork :=
       (
         switch ReconcilerGlobals.nextUnitOfWork^ {
-        | Some(unitOfWork) =>
-          /* Debug.getFiberTag(unitOfWork)
-             ++ " "
-             ++ Debug.getFiberElement(unitOfWork)
-             |> print_endline; */
-          ReconcilerWorker.perfomUnitOfWork(unitOfWork)
+        | Some(unitOfWork) => ReconcilerWorker.perfomUnitOfWork(unitOfWork)
         | None => None
         }
       );
   };
   switch ReconcilerGlobals.pendingCommit^ {
-  | Some(Fiber(pendingCommit)) =>
-    /* let printedFiber = Debug.printFiber(pendingCommit, 1);
-       print_endline(printedFiber); */
-    ReconcilerCommit.commitAllWork(pendingCommit)
+  | Some(Fiber(pendingCommit)) => ReconcilerCommit.commitAllWork(pendingCommit)
   | None => ()
   };
 };
@@ -101,7 +90,7 @@ let rec perfomWork = () => {
     | None => false
     };
   ReconcilerGlobals.globalWorker.work = perfomWork;
-  if (moreWork || List.length(ReconcilerGlobals.updateQueue^) > 0) {
+  if (moreWork || Belt.List.length(ReconcilerGlobals.updateQueue^) > 0) {
     perfomWork();
   };
 };

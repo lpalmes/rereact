@@ -11,7 +11,7 @@ let render = (reactElement: reactElement, containerName) =>
   switch (Webapi.Dom.Document.getElementById(containerName, Webapi.Dom.document)) {
   | Some(dom) =>
     ReconcilerGlobals.updateQueue :=
-      ReconcilerGlobals.updateQueue^ @ [HostRoot({dom, children: reactElement})];
+      Belt.List.concat(ReconcilerGlobals.updateQueue^, [HostRoot({dom, children: reactElement})]);
     ReconcilerScheduler.perfomWork();
   | None => ()
   };

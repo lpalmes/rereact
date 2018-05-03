@@ -34,9 +34,8 @@ let getFiberElement = element =>
   };
 
 let printEffects = effects =>
-  List.iter(
-    f => getFiberEffect(f) ++ " " ++ getFiberElement(f.fiberType) |> print_endline,
-    effects
+  Belt.List.forEach(effects, f =>
+    getFiberEffect(f) ++ " " ++ getFiberElement(f.fiberType) |> print_endline
   );
 
 let rec printFiber = (Fiber(fiber), spaces: int) => {
@@ -56,7 +55,6 @@ let rec printFiber = (Fiber(fiber), spaces: int) => {
   ++ " ("
   ++ elementType
   ++ ")\n"
-  ++ String.make(spaces, '-')
   ++ (
     switch fiber.child {
     | Some(f) => printFiber(f, spaces + 1)

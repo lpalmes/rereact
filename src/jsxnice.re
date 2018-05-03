@@ -452,28 +452,25 @@ module Box = {
         ];
         let styles =
           (
-            List.fold_left(
-              (styles, style) =>
-                switch style {
-                | Some(s) => [s, ...styles]
-                | None => styles
-                },
-              [],
-              stylesProps
+            Belt.List.reduce(stylesProps, [], (styles, style) =>
+              switch style {
+              | Some(s) => [s, ...styles]
+              | None => styles
+              }
             )
-            |> List.append(
+            |> Belt.List.concat(
                  switch raw {
-                 | Some(list) => List.map(((a, b)) => Raw(a, b), list)
+                 | Some(list) => Belt.List.map(list, ((a, b)) => Raw(a, b))
                  | None => []
                  }
                )
-            |> List.append(
+            |> Belt.List.concat(
                  switch select {
-                 | Some(list) => List.map(((a, b)) => Select(a, b), list)
+                 | Some(list) => Belt.List.map(list, ((a, b)) => Select(a, b))
                  | None => []
                  }
                )
-            |> Array.of_list
+            |> Belt.List.toArray
             |> css
           )
           ++ " "
